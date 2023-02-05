@@ -17,23 +17,6 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-void get_three_arguments(struct intr_frame *f, int choose_syscall, void *args){
-  int fd = *(int *)args + 4;
-  void *buffer = *(int *)args + 8;
-  unsigned size = *(int *)args + 12;
-
-  switch (choose_syscall) {
-    
-    case SYS_WRITE:
-      
-      f->eax = write(fd, buffer, size);
-      break;
-
-    default:
-      break;
-  }
-}
-
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
@@ -45,23 +28,27 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   switch (syscall_num) {
 
-    case SYS_WRITE:
-      get_three_arguments(f, SYS_WRITE, args);
-      break;
+    case SYS_WRITE:{
+      int fd = *((int *)f->esp+1);
+      void *buffer = *((int *)f->esp+2);
+      unsigned size = *((unsigned *)f->esp+3);
+
+      f->eax = write(fd, buffer, size);
+
+      break;}
 
     case SYS_HALT:
-
+    {
       shutdown_power_off();
-
       break;
+    }
 
-
-    case SYS_EXIT:
+    case SYS_EXIT:{
       
-      int exit_bit = *(int *)args + 4;
+      int exit_bit = *((int *)f->esp + 1);
       exit(exit_bit);
       break;
-
+      }
 
     case SYS_EXEC:
       printf ("exec system call!\n");
@@ -116,11 +103,26 @@ syscall_handler (struct intr_frame *f UNUSED)
       break;
 
   }
-  thread_exit ();
+  // thread_exit ();
 }
 
 
 int write(int fd, const void *buffer, unsigned size) {
-  printf ("write system call!\n");
+
+  // printf("fd: %d\n", fd);
+  printf("size: %d\n", (int)size);
+  // printf("buffer[0]: %c\n", *(char*)buffer);
+  if (fd == 1){
+    putbuf((const char *)buffer, size);
+    return size;
+  }
+
   return 0;
+}
+
+void exit(int exit_bit) {
+  struct thread *cur = thread_current();
+  printf("%s: exit(%d)\n", cur->name, exit_bit);
+
+  thread_exit();
 }
